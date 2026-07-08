@@ -30,6 +30,11 @@ class Borrowing extends Model
         'alasan_override',
         'alasan_penolakan',
         'catatan',
+        'needs_manager_approval',
+        'manager_approved',
+        'manager_approved_by',
+        'manager_approved_at',
+        'manager_alasan_penolakan',
     ];
 
     /**
@@ -46,6 +51,9 @@ class Borrowing extends Model
             'approved_at' => 'datetime',
             'fifo_override' => 'boolean',
             'status' => StatusBorrowing::class,
+            'needs_manager_approval' => 'boolean',
+            'manager_approved' => 'boolean',
+            'manager_approved_at' => 'datetime',
         ];
     }
 
@@ -67,6 +75,16 @@ class Borrowing extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Get the manager who approved this borrowing.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function managerApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_approved_by');
     }
 
     /**

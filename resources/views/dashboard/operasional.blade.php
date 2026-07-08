@@ -92,20 +92,78 @@
     </div>
 
     {{-- ===== GRAFIK + APPROVAL ===== --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {{-- Grafik Peminjaman --}}
-        <div class="card lg:col-span-2">
-            <div class="card-header">
-                <p class="card-title">Aktivitas Peminjaman</p>
-                <span class="text-xs text-gray-400 font-semibold bg-gray-100 rounded-md px-2 py-0.5">Tahun {{ date('Y') }}</span>
+        {{-- Left Side: Chart & Procurements --}}
+        <div class="lg:col-span-2 space-y-6">
+            {{-- Grafik Peminjaman --}}
+            <div class="card">
+                <div class="card-header">
+                    <p class="card-title">Aktivitas Peminjaman</p>
+                    <span class="text-xs text-gray-400 font-semibold bg-gray-100 rounded-md px-2 py-0.5">Tahun {{ date('Y') }}</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="borrowingChart" height="220"></canvas>
+                </div>
             </div>
-            <div class="card-body">
-                <canvas id="borrowingChart" height="220"></canvas>
+
+            {{-- Proses Pengadaan Aset --}}
+            <div class="card border border-rose-100 bg-rose-50/5">
+                <div class="card-header border-b border-rose-50 bg-rose-50/10 flex justify-between items-center">
+                    <p class="card-title text-rose-950 flex items-center gap-1.5 font-bold">
+                        <span class="w-2.5 h-2.5 bg-rose-600 rounded-full animate-pulse"></span>
+                        Proses Pengadaan Aset
+                    </p>
+                    <span class="badge badge-ditolak text-[10px]">{{ $procurementRequests->count() }} Pengajuan</span>
+                </div>
+                <div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto bg-white">
+                    @forelse($procurementRequests as $pr)
+                        <div x-data="{ openProcure: false }" class="p-4 flex flex-col gap-2">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-gray-800">{{ $pr->product->nama_barang }}</p>
+                                    <p class="text-xs text-gray-400">Qty: <strong class="text-gray-700">{{ $pr->quantity }} unit</strong> · Pengaju: {{ $pr->requester->name }}</p>
+                                </div>
+                                <div class="flex gap-1 shrink-0">
+                                    <button @click="openProcure = !openProcure" class="btn-xs btn-primary">Proses</button>
+                                    <form method="POST" action="{{ route('procurement.reject', $pr->id) }}" onsubmit="return confirm('Tolak pengadaan barang ini?')">
+                                        @csrf
+                                        <button type="submit" class="btn-xs btn-secondary text-red-600">Tolak</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {{-- Inline Form to add details --}}
+                            <div x-show="openProcure" x-transition class="bg-gray-50 border border-gray-100 rounded-lg p-3 mt-1 space-y-3">
+                                <p class="text-xs font-bold text-gray-700">Daftarkan Unit Hasil Pengadaan</p>
+                                <form method="POST" action="{{ route('procurement.approve', $pr->id) }}" class="space-y-3">
+                                    @csrf
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 block mb-1">HARGA PEROLEHAN PER UNIT (RP)</label>
+                                        <input name="harga_perolehan" type="number" required placeholder="Contoh: 8500000" class="form-input text-xs w-full py-1 px-2.5 h-8" />
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 block mb-1">LOKASI PENYIMPANAN</label>
+                                        <input name="lokasi_penyimpanan" type="text" required placeholder="Contoh: Gudang IT Lt. 2" class="form-input text-xs w-full py-1 px-2.5 h-8" />
+                                    </div>
+                                    <p class="text-[10px] text-gray-500 bg-amber-50 border border-amber-100 rounded p-2">
+                                        💡 Menyetujui akan mendaftarkan secara otomatis <strong>{{ $pr->quantity }} unit baru</strong> untuk barang ini berstatus <strong>Tersedia</strong> dengan kondisi <strong>Baik</strong>.
+                                    </p>
+                                    <div class="flex justify-end gap-1.5">
+                                        <button @click="openProcure = false" type="button" class="btn-xs btn-secondary">Batal</button>
+                                        <button type="submit" class="btn-xs btn-primary">Selesaikan & Registrasi</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="px-5 py-6 text-center text-xs text-gray-400">Tidak ada pengajuan pengadaan barang saat ini.</div>
+                    @endforelse
+                </div>
             </div>
         </div>
 
-        {{-- Pengajuan Menunggu Approval --}}
+        {{-- Right Side Tasks Stack (Borrowing Approvals) --}}
         <div class="card">
             <div class="card-header">
                 <p class="card-title">Menunggu Approval</p>
@@ -115,7 +173,7 @@
                 @forelse($pendingList as $p)
                     <div class="px-5 py-3 flex items-center justify-between gap-3">
                         <div class="min-w-0 flex-1">
-                            <p class="text-sm font-medium text-gray-800 truncate">{{ $p->borrower->name }}</p>
+                            <p class="text-sm font-semibold text-gray-800 truncate">{{ $p->borrower->name }}</p>
                             <p class="text-xs text-gray-400 truncate">
                                 {{ $p->details->map(fn($d) => optional($d->product)->nama_barang)->filter()->unique()->implode(', ') }} · {{ $p->tanggal_pengajuan->format('d M Y') }}
                             </p>
@@ -140,7 +198,7 @@
     </div>
 
     {{-- ===== ALERT STOK MINIMUM + KATEGORI ===== --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
         {{-- Alert Stok Minimum --}}
         <div class="card">
@@ -156,32 +214,30 @@
             <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
                 <table class="table">
                     <thead>
-                        <tr class="bg-gray-50/50">
-                            <th class="py-2.5 text-[10px] text-gray-500 font-semibold uppercase tracking-wider pl-5">Nama Barang</th>
-                            <th class="py-2.5 text-[10px] text-gray-500 font-semibold uppercase tracking-wider text-center">Tersedia</th>
-                            <th class="py-2.5 text-[10px] text-gray-500 font-semibold uppercase tracking-wider text-center pr-5">Minimum</th>
+                        <tr>
+                            <th class="pl-5">Nama Barang</th>
+                            <th class="text-center">Tersedia</th>
+                            <th class="text-center pr-5">Minimum</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse($lowStocks as $s)
                             <tr class="hover:bg-gray-50/50 transition">
-                                <td class="py-3 pl-5">
-                                    <p class="text-sm font-semibold text-gray-800">{{ $s->nama_barang }}</p>
+                                <td class="py-3.5 pl-5">
+                                    <p class="text-sm font-semibold text-gray-900">{{ $s->nama_barang }}</p>
                                     <p class="text-xs text-gray-400 mt-0.5">{{ $s->category?->nama_kategori ?? '—' }}</p>
                                 </td>
-                                <td class="py-3 text-center">
+                                <td class="py-3.5 text-center">
                                     @if($s->units_count == 0)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800">
-                                            Habis
-                                        </span>
+                                        <span class="badge badge-ditolak font-medium">Habis</span>
                                     @else
-                                        <span class="text-sm font-bold text-red-600">
+                                        <span class="badge bg-red-50 text-red-700 border border-red-100 font-medium">
                                             {{ $s->units_count }} Unit
                                         </span>
                                     @endif
                                 </td>
-                                <td class="py-3 text-center pr-5">
-                                    <span class="text-xs font-semibold text-gray-500 bg-gray-100 rounded-md px-2 py-0.5">
+                                <td class="py-3.5 text-center pr-5">
+                                    <span class="badge bg-gray-50 text-gray-600 border border-gray-200 font-medium">
                                         {{ $s->stok_minimum }} Unit
                                     </span>
                                 </td>
@@ -258,8 +314,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('borrowingChart');
     if (!ctx) return;
 
-    // Set global font family to Poppins
-    Chart.defaults.font.family = 'Poppins';
+    // Set global font family to SF Pro / System
+    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif';
     Chart.defaults.font.size = 11;
     Chart.defaults.color = '#64748B';
 
@@ -305,8 +361,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 tooltip: {
                     backgroundColor: '#1E293B',
                     padding: 10,
-                    bodyFont: { family: 'Poppins' },
-                    titleFont: { family: 'Poppins', weight: '600' }
+                    bodyFont: { family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' },
+                    titleFont: { family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif', weight: '600' }
                 }
             },
             scales: {

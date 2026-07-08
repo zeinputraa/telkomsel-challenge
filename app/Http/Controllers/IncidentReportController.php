@@ -247,7 +247,8 @@ class IncidentReportController extends Controller
             }
         });
 
-        return redirect()->route('incidents.show', $incident->id)->with('success', 'Laporan insiden berhasil difinalisasi Admin.');
+        return redirect()->route('incidents.show', $incident->id)
+            ->with('success', 'Laporan insiden berhasil difinalisasi oleh ' . (auth()->user()->hasRole('manager') ? 'Manager' : 'Admin') . '.');
     }
 
     /**

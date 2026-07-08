@@ -26,14 +26,12 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID Laporan</th>
-                        <th>Kode Unit</th>
-                        <th>Barang</th>
-                        <th>Pelapor</th>
+                        <th class="pl-5 w-1/5">ID Laporan / Unit</th>
+                        <th class="w-1/3">Barang / Pelapor</th>
                         <th>Jenis Masalah</th>
                         <th>Status Verifikasi</th>
                         <th>Tanggal Lapor</th>
-                        <th>Aksi</th>
+                        <th class="text-right pr-5">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-50">
@@ -77,10 +75,14 @@
                             }
                         @endphp
                         <tr x-show="tab === 'semua' || tab === '{{ $tabVal }}'">
-                            <td class="font-mono text-xs font-semibold text-gray-700">INC-{{ str_pad($inc->id, 5, '0', STR_PAD_LEFT) }}</td>
-                            <td class="font-mono text-xs">{{ $inc->productUnit ? $inc->productUnit->kode_unit : '—' }}</td>
-                            <td class="font-medium text-gray-900">{{ $inc->productUnit ? $inc->productUnit->product->nama_barang : '—' }}</td>
-                            <td>{{ $inc->reporter ? $inc->reporter->name : '—' }}</td>
+                            <td class="pl-5 whitespace-normal">
+                                <p class="font-mono text-xs font-semibold text-gray-700">INC-{{ str_pad($inc->id, 5, '0', STR_PAD_LEFT) }}</p>
+                                <p class="font-mono text-[10px] text-gray-400 mt-0.5">{{ $inc->productUnit ? $inc->productUnit->kode_unit : '—' }}</p>
+                            </td>
+                            <td class="whitespace-normal">
+                                <p class="font-medium text-gray-900">{{ $inc->productUnit ? $inc->productUnit->product->nama_barang : '—' }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Pelapor: {{ $inc->reporter ? $inc->reporter->name : '—' }}</p>
+                            </td>
                             <td>
                                 <span class="badge {{ $badgeKondisi[$jenisVal] ?? '' }}">
                                     {{ $labelKondisi[$jenisVal] ?? $jenisVal }}
@@ -91,14 +93,16 @@
                                     {{ $labelStatus[$statusVal] ?? $statusVal }}
                                 </span>
                             </td>
-                            <td class="text-gray-500 text-xs">{{ $inc->created_at ? $inc->created_at->format('d M Y') : '—' }}</td>
-                            <td>
-                                <a href="{{ route('incidents.show', $inc->id) }}" class="btn-sm btn-secondary font-medium">Detail</a>
+                            <td class="text-gray-500 text-xs whitespace-normal">{{ $inc->created_at ? $inc->created_at->format('d M Y') : '—' }}</td>
+                            <td class="pr-5">
+                                <div class="flex items-center justify-end">
+                                    <a href="{{ route('incidents.show', $inc->id) }}" class="btn-sm btn-secondary font-medium">Detail</a>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-gray-400 py-6 text-sm">Tidak ada laporan insiden ditemukan.</td>
+                            <td colspan="6" class="text-center text-gray-400 py-6 text-sm">Tidak ada laporan insiden ditemukan.</td>
                         </tr>
                     @endforelse
                 </tbody>

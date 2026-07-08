@@ -11,10 +11,11 @@ use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Notifications\BorrowingApproved;
 use App\Notifications\BorrowingRejected;
+use App\Notifications\StockExhaustedForQueue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class BorrowingController extends Controller
@@ -121,6 +122,15 @@ class BorrowingController extends Controller
             }
         }
 
+        // Calculate estimated total value
+        $totalEstimatedValue = 0;
+        foreach ($request->items as $item) {
+            $product = Product::findOrFail($item['product_id']);
+            $avgAcquisitionPrice = $product->units()->avg('harga_perolehan') ?? 0;
+            $totalEstimatedValue += $avgAcquisitionPrice * $item['qty'];
+        }
+        $needsManagerApproval = $totalEstimatedValue > 10000000;
+
         // Generate kode_peminjaman: BRW-YYYYMM-XXXX
         // Gunakan MAX atas suffix numerik dalam bulan berjalan (collision-safe seperti kode_unit)
         $bulanPrefix = 'BRW-'.date('Ym').'-';
@@ -136,7 +146,7 @@ class BorrowingController extends Controller
 
         $kode = $bulanPrefix.str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 
-        DB::transaction(function () use ($user, $request, $kode) {
+        DB::transaction(function () use ($user, $request, $kode, $needsManagerApproval) {
             $borrowing = Borrowing::create([
                 'user_id' => $user->id,
                 'kode_peminjaman' => $kode,
@@ -145,6 +155,7 @@ class BorrowingController extends Controller
                 'tanggal_kembali_rencana' => $request->tanggal_kembali_rencana,
                 'status' => StatusBorrowing::Diajukan->value,
                 'catatan' => $request->catatan,
+                'needs_manager_approval' => $needsManagerApproval,
             ]);
 
             foreach ($request->items as $item) {
@@ -252,10 +263,22 @@ class BorrowingController extends Controller
 
             // Send notification to the borrower
             $productNamesStr = implode(', ', $insufficientProducts);
-            $borrowing->borrower->notify(new \App\Notifications\StockExhaustedForQueue($borrowing, $productNamesStr));
+            $borrowing->borrower->notify(new StockExhaustedForQueue($borrowing, $productNamesStr));
 
             return redirect()->route('borrowings.show', $borrowing->id)
                 ->with('error', 'Pengajuan otomatis dibatalkan karena unit fisik yang berstatus tersedia tidak mencukupi di gudang saat ini.');
+        }
+
+        $isOverride = $request->boolean('fifo_override');
+        if ($borrowing->needs_manager_approval || $isOverride) {
+            $borrowing->update([
+                'needs_manager_approval' => true,
+                'fifo_override' => $isOverride,
+                'alasan_override' => $request->alasan_override,
+            ]);
+
+            return redirect()->route('borrowings.show', $borrowing->id)
+                ->with('warning', 'Persetujuan ditangguhkan menunggu otorisasi Manager (karena nilai tinggi atau memerlukan override FIFO).');
         }
 
         try {
@@ -334,7 +357,7 @@ class BorrowingController extends Controller
                     }
 
                     // Notify borrower
-                    $op->borrower->notify(new \App\Notifications\StockExhaustedForQueue($op, $productName));
+                    $op->borrower->notify(new StockExhaustedForQueue($op, $productName));
                 }
             }
 
@@ -545,7 +568,7 @@ class BorrowingController extends Controller
 
                     // Notify borrower
                     $productName = optional($detailsGroup->first()->product)->nama_barang ?? 'Barang';
-                    $pb->borrower->notify(new \App\Notifications\StockExhaustedForQueue($pb, $productName));
+                    $pb->borrower->notify(new StockExhaustedForQueue($pb, $productName));
                 }
             }
 
@@ -557,5 +580,165 @@ class BorrowingController extends Controller
                 ]);
             }
         }
+    }
+
+    /**
+     * Approve borrowing request by Manager.
+     */
+    public function approveManager(Request $request, string $id): RedirectResponse
+    {
+        if (! auth()->user()->hasRole('manager', 'admin')) {
+            abort(403, 'Hanya Manager yang berwenang melakukan otorisasi ini.');
+        }
+
+        $borrowing = Borrowing::findOrFail($id);
+
+        $insufficientProducts = [];
+        foreach ($borrowing->details->groupBy('product_id') as $prodId => $detailsGroup) {
+            $reqQty = $detailsGroup->count();
+            $availableUnitsCount = ProductUnit::where('product_id', $prodId)
+                ->where('status', StatusUnit::Tersedia->value)
+                ->count();
+
+            if ($availableUnitsCount < $reqQty) {
+                $productName = optional($detailsGroup->first()->product)->nama_barang ?? 'Barang';
+                $insufficientProducts[] = $productName;
+            }
+        }
+
+        if (! empty($insufficientProducts)) {
+            DB::transaction(function () use ($borrowing) {
+                $borrowing->update([
+                    'status' => StatusBorrowing::DibatalkanOtomatis->value,
+                    'alasan_penolakan' => 'Stok unit fisik di gudang tidak mencukupi saat ini.',
+                ]);
+
+                foreach ($borrowing->details as $detail) {
+                    $detail->update([
+                        'status' => StatusBorrowingDetail::Ditolak->value,
+                    ]);
+                }
+            });
+
+            $productNamesStr = implode(', ', $insufficientProducts);
+            $borrowing->borrower->notify(new StockExhaustedForQueue($borrowing, $productNamesStr));
+
+            return redirect()->route('borrowings.show', $borrowing->id)
+                ->with('error', 'Otorisasi otomatis dibatalkan karena unit fisik yang berstatus tersedia tidak mencukupi di gudang saat ini.');
+        }
+
+        try {
+            DB::transaction(function () use ($borrowing) {
+                $borrowing->update([
+                    'status' => StatusBorrowing::Disetujui->value,
+                    'approved_by' => auth()->id(),
+                    'approved_at' => now(),
+                    'manager_approved' => true,
+                    'manager_approved_by' => auth()->id(),
+                    'manager_approved_at' => now(),
+                ]);
+
+                foreach ($borrowing->details as $detail) {
+                    $unit = ProductUnit::where('product_id', $detail->product_id)
+                        ->where('status', StatusUnit::Tersedia->value)
+                        ->whereNotIn('id', $borrowing->details()
+                            ->whereNotNull('product_unit_id')
+                            ->pluck('product_unit_id'))
+                        ->first();
+
+                    if (! $unit) {
+                        throw new \Exception('Gagal menyetujui, unit fisik yang berstatus tersedia tidak mencukupi saat ini.');
+                    }
+
+                    $detail->update([
+                        'product_unit_id' => $unit->id,
+                        'status' => StatusBorrowingDetail::Disetujui->value,
+                        'kondisi_saat_pinjam' => $unit->kondisi,
+                    ]);
+
+                    $unit->update(['status' => StatusUnit::Dipinjam->value]);
+                }
+            });
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        $borrowing->borrower->notify(new BorrowingApproved($borrowing));
+
+        $startStr = $borrowing->tanggal_pinjam_rencana->format('Y-m-d');
+        $endStr = $borrowing->tanggal_kembali_rencana->format('Y-m-d');
+
+        $overlappingPending = Borrowing::where('status', StatusBorrowing::Diajukan->value)
+            ->where('id', '!=', $borrowing->id)
+            ->where('tanggal_pinjam_rencana', '<=', $endStr)
+            ->where('tanggal_kembali_rencana', '>=', $startStr)
+            ->whereHas('details', function ($q) use ($borrowing) {
+                $q->whereIn('product_id', $borrowing->details->pluck('product_id'));
+            })
+            ->get();
+
+        foreach ($overlappingPending as $op) {
+            $hasChange = false;
+            foreach ($op->details->groupBy('product_id') as $prodId => $detailsGroup) {
+                $reqQty = $detailsGroup->count();
+                $isSufficient = $this->isStockSufficientForPeriod(
+                    $prodId,
+                    $op->tanggal_pinjam_rencana,
+                    $op->tanggal_kembali_rencana,
+                    $reqQty
+                );
+
+                if (! $isSufficient) {
+                    $hasChange = true;
+                    $productName = optional($detailsGroup->first()->product)->nama_barang ?? 'Barang';
+
+                    foreach ($detailsGroup as $detail) {
+                        $detail->update([
+                            'status' => StatusBorrowingDetail::Ditolak->value,
+                        ]);
+                    }
+
+                    $op->borrower->notify(new StockExhaustedForQueue($op, $productName));
+                }
+            }
+
+            if ($hasChange) {
+                $op->update([
+                    'status' => StatusBorrowing::DibatalkanOtomatis->value,
+                    'alasan_penolakan' => 'Stok habis dialokasikan ke antrean sebelumnya.',
+                ]);
+            }
+        }
+
+        return redirect()->route('borrowings.show', $borrowing->id)->with('success', 'Pengajuan peminjaman berhasil disetujui oleh Manager!');
+    }
+
+    /**
+     * Reject borrowing request by Manager.
+     */
+    public function rejectManager(Request $request, string $id): RedirectResponse
+    {
+        if (! auth()->user()->hasRole('manager', 'admin')) {
+            abort(403, 'Hanya Manager yang berwenang melakukan otorisasi ini.');
+        }
+
+        $request->validate([
+            'alasan_penolakan' => 'required|string|max:500',
+        ]);
+
+        $borrowing = Borrowing::findOrFail($id);
+
+        $borrowing->update([
+            'status' => StatusBorrowing::Ditolak->value,
+            'alasan_penolakan' => $request->alasan_penolakan,
+            'manager_approved' => false,
+            'manager_approved_by' => auth()->id(),
+            'manager_approved_at' => now(),
+            'manager_alasan_penolakan' => $request->alasan_penolakan,
+        ]);
+
+        $borrowing->borrower->notify(new BorrowingRejected($borrowing));
+
+        return redirect()->route('borrowings.show', $borrowing->id)->with('success', 'Pengajuan peminjaman ditolak oleh Manager.');
     }
 }

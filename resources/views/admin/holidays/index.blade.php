@@ -48,13 +48,18 @@
                             @php
                                 $tipeVal = $h->jenis->value ?? $h->jenis;
                                 $tipeBadge = match($tipeVal) {
-                                    'Nasional' => 'badge-disetujui',
-                                    'Keagamaan' => 'badge-maintenance',
+                                    'libur_nasional', 'Nasional' => 'badge-disetujui',
+                                    'cuti_bersama', 'Cuti Bersama', 'Keagamaan' => 'badge-maintenance',
                                     default => 'badge-secondary',
+                                };
+                                $tipeLabel = match($tipeVal) {
+                                    'libur_nasional', 'Nasional' => 'Libur Nasional',
+                                    'cuti_bersama', 'Cuti Bersama' => 'Cuti Bersama',
+                                    default => ucfirst(str_replace('_', ' ', $tipeVal)),
                                 };
                             @endphp
                             <span class="badge {{ $tipeBadge }} text-[10px]">
-                                {{ $tipeVal }}
+                                {{ $tipeLabel }}
                             </span>
                         </td>
                         <td class="w-20">
@@ -94,9 +99,8 @@
                 <div class="form-group">
                     <label class="form-label">Tipe Hari Libur <span class="text-red-500">*</span></label>
                     <select name="jenis" class="form-select" required>
-                        <option value="Nasional">Nasional</option>
-                        <option value="Keagamaan">Keagamaan</option>
-                        <option value="Lainnya">Lainnya</option>
+                        <option value="libur_nasional">Libur Nasional</option>
+                        <option value="cuti_bersama">Cuti Bersama</option>
                     </select>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">

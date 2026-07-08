@@ -22,6 +22,11 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Kategori: Bisa dilihat oleh Admin, Staff, dan Manager (Read-only untuk Manager)
+    Route::middleware('role:admin,staff,manager')->group(function () {
+        Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+    });
+
     // ============================================================
     // MASTER DATA — Staff & Admin
     // ============================================================
@@ -30,8 +35,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return redirect()->route('dashboard');
         })->name('operasional.dashboard');
 
-        // Categories resource (CRUD Master Data Kategori)
-        Route::resource('categories', CategoryController::class);
+        // Modifikasi Kategori: Hanya untuk Admin & Staff
+        Route::resource('categories', CategoryController::class)->except(['index']);
 
         // Nested routes for product units
         Route::prefix('products/{product}/units')->group(function () {
@@ -95,8 +100,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::middleware('role:admin,staff')->group(function () {
         Route::post('/insiden/{id}/verify', [IncidentReportController::class, 'verify'])->name('incidents.verify');
+        Route::post('/procurement/{id}/approve', [DashboardController::class, 'approveProcurement'])->name('procurement.approve');
+        Route::post('/procurement/{id}/reject', [DashboardController::class, 'rejectProcurement'])->name('procurement.reject');
     });
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('role:admin,manager')->group(function () {
         Route::post('/insiden/{id}/finalize', [IncidentReportController::class, 'finalize'])->name('incidents.finalize');
     });
 
@@ -115,6 +122,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================================
     Route::middleware('role:admin,manager')->group(function () {
         Route::get('/dashboard/manager', [DashboardController::class, 'manager'])->name('dashboard.manager');
+        Route::post('/peminjaman/{id}/approve-manager', [BorrowingController::class, 'approveManager'])->name('borrowings.approveManager');
+        Route::post('/peminjaman/{id}/reject-manager', [BorrowingController::class, 'rejectManager'])->name('borrowings.rejectManager');
+        Route::post('/procurement/request/{product}', [DashboardController::class, 'storeProcurement'])->name('procurement.store');
     });
 
     // ============================================================

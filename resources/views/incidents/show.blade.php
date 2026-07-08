@@ -149,9 +149,9 @@
             </div>
 
             {{-- Form Aksi Sesuai Role --}}
-            @if(auth()->user()->hasRole('admin', 'staff'))
+            @if(auth()->user()->hasRole('admin', 'staff', 'manager'))
                 {{-- STAFF VERIFICATION FORM (Only if status is waiting verif) --}}
-                @if($statusVal === 'menunggu_verifikasi_staff')
+                @if($statusVal === 'menunggu_verifikasi_staff' && auth()->user()->hasRole('admin', 'staff'))
                     <div class="card">
                         <div class="card-header">
                             <p class="card-title">Aksi Peninjauan Aset (Staff Verifikasi)</p>
@@ -185,14 +185,14 @@
                     </div>
                 @endif
 
-                {{-- ADMIN FINALIZATION FORM (Only if status is waiting finalization AND role is admin) --}}
-                @if($statusVal === 'menunggu_finalisasi_admin' && auth()->user()->hasRole('admin'))
+                {{-- ADMIN/MANAGER FINALIZATION FORM (Only if status is waiting finalization AND role is admin/manager) --}}
+                @if($statusVal === 'menunggu_finalisasi_admin' && auth()->user()->hasRole('admin', 'manager'))
                     <div class="card" x-data="{ state: 'write_off' }">
                         <div class="card-header">
-                            <p class="card-title">Aksi Peninjauan Aset (Admin Finalisasi)</p>
+                            <p class="card-title">Aksi Peninjauan Aset (Admin/Manager Finalisasi)</p>
                         </div>
                         <div class="card-body">
-                            <p class="text-xs text-gray-500 mb-4">Sebagai Admin, Anda berwenang melakukan finalisasi write-off permanen atau menuntut ganti rugi aset yang rusak/hilang.</p>
+                            <p class="text-xs text-gray-500 mb-4">Sebagai Admin/Manager, Anda berwenang melakukan finalisasi write-off permanen atau menuntut ganti rugi aset yang rusak/hilang.</p>
                             <form method="POST" action="{{ route('incidents.finalize', $incident->id) }}" class="space-y-4">
                                 @csrf
                                 <div class="form-group">
@@ -221,7 +221,7 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <x-input-label for="catatan_admin" :value="__('Catatan Keputusan Admin')" />
+                                    <x-input-label for="catatan_admin" :value="__('Catatan Keputusan')" />
                                     <textarea id="catatan_admin" name="catatan_admin" rows="2" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm" placeholder="Alasan keputusan write-off atau nominal denda..."></textarea>
                                     <x-input-error :messages="$errors->get('catatan_admin')" class="mt-2" />
                                 </div>

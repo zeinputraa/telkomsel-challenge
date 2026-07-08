@@ -28,14 +28,11 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Kode</th>
-                        <th>Peminjam</th>
-                        <th>Barang Dipinjam</th>
-                        <th>Tgl Pinjam</th>
-                        <th>Tgl Kembali</th>
+                        <th class="pl-5 w-1/4">Peminjam / Kode</th>
+                        <th class="w-1/3">Barang Dipinjam</th>
+                        <th>Periode Pinjam</th>
                         <th>Status</th>
-                        <th>FIFO</th>
-                        <th>Aksi</th>
+                        <th class="text-right pr-5">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-50">
@@ -68,47 +65,56 @@
                             }
                         @endphp
                         <tr x-show="tab === 'semua' || tab === '{{ $tabVal }}'">
-                            <td class="font-mono text-xs text-gray-700">{{ $b->kode_peminjaman }}</td>
-                            <td class="font-medium text-gray-900">{{ $b->borrower->name }}</td>
-                            <td>
-                                <div class="space-y-0.5">
-                                    {{-- Group details by product_id to show a clean product listing --}}
+                            <td class="pl-5 whitespace-normal">
+                                <p class="font-medium text-gray-900">{{ $b->borrower->name }}</p>
+                                <p class="font-mono text-[10px] text-gray-400 mt-0.5">{{ $b->kode_peminjaman }}</p>
+                            </td>
+                            <td class="whitespace-normal">
+                                <div class="flex flex-wrap gap-1 items-center">
                                     @foreach($b->details->groupBy('product_id') as $productId => $detailsGroup)
                                         @php $detail = $detailsGroup->first(); @endphp
-                                        <p class="text-xs font-medium text-gray-800">
-                                            {{ $detail->product->nama_barang }} ({{ $detailsGroup->count() }}x)
-                                        </p>
+                                        <div class="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-md px-2 py-0.5 text-xs text-gray-700">
+                                            <span class="font-medium">{{ $detail->product->nama_barang ?? '—' }}</span>
+                                            <span class="text-[9px] text-gray-400 font-bold">x{{ $detailsGroup->count() }}</span>
+                                        </div>
                                     @endforeach
+                                    @if($b->fifo_override)
+                                        <span class="badge badge-warning text-[9px] py-0 px-1 ml-1" title="Sistem FIFO Dilewati: {{ $b->alasan_override }}">FIFO Override</span>
+                                    @endif
                                 </div>
                             </td>
-                            <td class="text-gray-500 text-xs">{{ $b->tanggal_pinjam_rencana ? $b->tanggal_pinjam_rencana->format('d M Y') : '—' }}</td>
-                            <td class="text-gray-500 text-xs {{ $tabVal === 'terlambat' ? 'text-red-600 font-bold' : '' }}">{{ $b->tanggal_kembali_rencana ? $b->tanggal_kembali_rencana->format('d M Y') : '—' }}</td>
+                            <td class="whitespace-normal">
+                                <div class="text-xs text-gray-500 space-y-0.5">
+                                    <p>{{ $b->tanggal_pinjam_rencana ? $b->tanggal_pinjam_rencana->format('d M Y') : '—' }} &rarr; {{ $b->tanggal_kembali_rencana ? $b->tanggal_kembali_rencana->format('d M Y') : '—' }}</p>
+                                    @if($tabVal === 'terlambat')
+                                        <span class="inline-flex items-center text-[10px] font-bold text-red-600 mt-0.5">
+                                            <svg class="w-3.5 h-3.5 mr-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                            </svg>
+                                            Terlambat
+                                        </span>
+                                    @endif
+                                </div>
+                            </td>
                             <td>
                                 <span class="badge {{ $badgeMap[$statusVal] ?? '' }}">
                                     {{ $labelMap[$statusVal] ?? $statusVal }}
                                 </span>
                             </td>
-                            <td>
-                                @if($b->fifo_override)
-                                    <span class="badge badge-warning text-[10px]">Override</span>
-                                @else
-                                    <span class="text-gray-300 text-xs">—</span>
-                                @endif
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1">
-                                    <a href="{{ route('borrowings.show', $b->id) }}" class="btn-sm btn-secondary">
+                            <td class="pr-5">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <a href="{{ route('borrowings.show', $b->id) }}" class="btn-sm btn-secondary font-medium">
                                         {{ in_array($statusVal, ['diajukan']) ? 'Proses' : 'Detail' }}
                                     </a>
                                     @if($statusVal === 'disetujui')
-                                        <a href="{{ route('borrowings.handover', $b->id) }}" class="btn-sm btn-success">Serah Terima</a>
+                                        <a href="{{ route('borrowings.handover', $b->id) }}" class="btn-sm btn-success font-medium">Serah Terima</a>
                                     @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-gray-400 py-6 text-sm">Tidak ada transaksi peminjaman ditemukan.</td>
+                            <td colspan="5" class="text-center text-gray-400 py-6 text-sm">Tidak ada transaksi peminjaman ditemukan.</td>
                         </tr>
                     @endforelse
                 </tbody>

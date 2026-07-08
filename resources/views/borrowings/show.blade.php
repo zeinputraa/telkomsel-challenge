@@ -75,6 +75,18 @@
                 @endif
             </div>
 
+            @if($borrowing->needs_manager_approval && is_null($borrowing->manager_approved) && $statusVal === 'diajukan')
+                <div class="alert-warning">
+                    <svg class="w-5 h-5 shrink-0 animate-pulse text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-sm text-amber-900">Menunggu Otorisasi Manager</p>
+                        <p class="text-xs text-amber-700 mt-1">Persetujuan ditangguhkan karena nilai peminjaman tinggi (>10 Juta) atau memerlukan override antrean FIFO.</p>
+                    </div>
+                </div>
+            @endif
+
             {{-- Override FIFO Alert --}}
             @if($isFifoOverrideNeeded)
                 <div class="alert-warning">
@@ -193,8 +205,8 @@
                 </table>
             </div>
 
-            {{-- Aksi Approval (Hanya untuk Admin/Staff dan jika status diajukan) --}}
-            @if(auth()->user()->hasRole('admin', 'staff') && $statusVal === 'diajukan')
+            {{-- Aksi Approval Staff (Hanya jika status diajukan dan tidak butuh manager approval) --}}
+            @if(auth()->user()->hasRole('admin', 'staff') && $statusVal === 'diajukan' && !$borrowing->needs_manager_approval)
                 <div class="card" x-data="{ showApprove: false, showReject: false, fifoOverride: false }">
                     <div class="card-header">
                         <p class="card-title">Tindakan Persetujuan</p>
@@ -262,6 +274,68 @@
                                 <div class="flex gap-2">
                                     <button type="submit" class="btn-danger btn-sm">Konfirmasi Tolak</button>
                                     <button type="button" @click="showReject = false" class="btn-ghost btn-sm text-gray-500">Batal</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Aksi Otorisasi Manager (Hanya jika status diajukan dan butuh approval manager) --}}
+            @if(auth()->user()->hasRole('manager', 'admin') && $borrowing->needs_manager_approval && is_null($borrowing->manager_approved) && $statusVal === 'diajukan')
+                <div class="card border border-amber-200" x-data="{ showMgrApprove: false, showMgrReject: false }">
+                    <div class="card-header bg-amber-50/50">
+                        <p class="card-title text-amber-900">Otorisasi Manager</p>
+                        <span class="badge badge-menunggu-admin">Manager Approval</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-xs text-gray-500 mb-4">Pengajuan ini memerlukan persetujuan Manager karena terdeteksi sebagai peminjaman bernilai tinggi (>10 Juta) atau memerlukan override antrean FIFO.</p>
+                        <div class="flex gap-3 mb-4">
+                            <button @click="showMgrApprove = !showMgrApprove; showMgrReject = false"
+                                    :class="showMgrApprove ? 'btn-success' : 'btn-secondary'"
+                                    class="btn">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Otorisasi Setujui
+                            </button>
+                            <button @click="showMgrReject = !showMgrReject; showMgrApprove = false"
+                                    :class="showMgrReject ? 'btn-danger' : 'btn-secondary'"
+                                    class="btn">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Tolak Pengajuan
+                            </button>
+                        </div>
+
+                        {{-- Panel Setujui --}}
+                        <div x-show="showMgrApprove" x-transition class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                            <p class="text-sm font-semibold text-emerald-800">Konfirmasi Otorisasi Setujui</p>
+                            <form method="POST" action="{{ route('borrowings.approveManager', $borrowing->id) }}" class="space-y-3">
+                                @csrf
+                                <p class="text-xs text-emerald-700">Dengan menyetujui, Anda memberikan otorisasi sebagai Manager untuk pengajuan peminjaman bernilai tinggi / override FIFO ini. Unit fisik akan dialokasikan otomatis.</p>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="btn-success btn-sm">Konfirmasi Otorisasi</button>
+                                    <button type="button" @click="showMgrApprove = false" class="btn-ghost btn-sm text-gray-500">Batal</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {{-- Panel Tolak --}}
+                        <div x-show="showMgrReject" x-transition class="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+                            <p class="text-sm font-semibold text-red-800">Konfirmasi Penolakan Manager</p>
+                            <form method="POST" action="{{ route('borrowings.rejectManager', $borrowing->id) }}" class="space-y-3">
+                                @csrf
+                                <div class="form-group">
+                                    <x-input-label for="manager_alasan_penolakan" :value="__('Alasan Penolakan')" class="text-red-800" />
+                                    <textarea id="manager_alasan_penolakan" name="alasan_penolakan" rows="2" required
+                                              class="mt-1 block w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" 
+                                              placeholder="Tulis alasan penolakan..."></textarea>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="btn-danger btn-sm">Konfirmasi Tolak</button>
+                                    <button type="button" @click="showMgrReject = false" class="btn-ghost btn-sm text-gray-500">Batal</button>
                                 </div>
                             </form>
                         </div>

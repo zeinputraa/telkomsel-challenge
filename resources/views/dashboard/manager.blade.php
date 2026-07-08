@@ -15,7 +15,7 @@
             <p class="page-subtitle">Pantau aktivitas inventaris secara keseluruhan</p>
         </div>
         {{-- No action buttons for manager --}}
-        <span class="badge badge-manager">Read Only</span>
+        <span class="badge badge-manager">Strategic Panel</span>
     </div>
 
     {{-- STAT CARDS --}}
@@ -78,8 +78,75 @@
         </div>
     </div>
 
+    {{-- PERSETUJUAN TERTUNDA (MANAGER APPROVAL) --}}
+    @if($pendingApprovals->isNotEmpty())
+        <div class="card border border-amber-200 bg-amber-50/10">
+            <div class="card-header border-b border-amber-100 flex justify-between items-center bg-amber-50/30">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    <p class="card-title text-amber-900 font-bold">Otorisasi Peminjaman Tertunda (Memerlukan Persetujuan Manager)</p>
+                </div>
+                <span class="badge badge-menunggu-admin">{{ $pendingApprovals->count() }} Pengajuan</span>
+            </div>
+            <div class="divide-y divide-gray-100 bg-white">
+                @foreach($pendingApprovals as $p)
+                    <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-semibold text-gray-900">{{ $p->kode_peminjaman }}</p>
+                                @if($p->fifo_override)
+                                    <span class="badge badge-maintenance">FIFO Override</span>
+                                @else
+                                    <span class="badge badge-terverifikasi">Nilai Tinggi (>10JT)</span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-gray-500">Peminjam: <strong class="text-gray-700">{{ $p->borrower->name }}</strong> · Diajukan: {{ $p->tanggal_pengajuan->format('d M Y H:i') }}</p>
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                @foreach($p->details->groupBy('product_id') as $prodId => $detailsGroup)
+                                    <span class="text-xs bg-slate-50 border border-slate-100 text-slate-700 px-2 py-1 rounded">
+                                        {{ $detailsGroup->first()->product->nama_barang }} ({{ $detailsGroup->count() }} unit)
+                                    </span>
+                                @endforeach
+                            </div>
+                            @if($p->alasan_override)
+                                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5 mt-2">
+                                    <strong>Alasan Override:</strong> "{{ $p->alasan_override }}"
+                                </p>
+                            @endif
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <a href="{{ route('borrowings.show', $p->id) }}" class="btn-sm btn-secondary">Detail</a>
+                            
+                            {{-- Quick Approve --}}
+                            <form method="POST" action="{{ route('borrowings.approveManager', $p->id) }}" onsubmit="return confirm('Setujui peminjaman ini?')">
+                                @csrf
+                                <button type="submit" class="btn-sm btn-primary">Setujui</button>
+                            </form>
+                            
+                            {{-- Quick Reject --}}
+                            <div x-data="{ openReject: false }" class="relative">
+                                <button @click="openReject = !openReject" type="button" class="btn-sm btn-danger">Tolak</button>
+                                <div x-show="openReject" @click.away="openReject = false" class="absolute right-0 bottom-full mb-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 p-4 z-50">
+                                    <p class="text-xs font-semibold text-gray-900 mb-2">Alasan Penolakan Manager</p>
+                                    <form method="POST" action="{{ route('borrowings.rejectManager', $p->id) }}">
+                                        @csrf
+                                        <textarea name="alasan_penolakan" required placeholder="Tulis alasan penolakan..." class="form-input text-xs w-full h-16 resize-none mb-3"></textarea>
+                                        <div class="flex justify-end gap-1.5">
+                                            <button @click="openReject = false" type="button" class="btn-xs btn-secondary">Batal</button>
+                                            <button type="submit" class="btn-xs btn-danger">Kirim Tolak</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- GRAFIK + AUDIT TRAIL --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div class="card lg:col-span-2">
             <div class="card-header">
                 <p class="card-title">Aktivitas Peminjaman</p>
@@ -178,6 +245,109 @@
         </div>
     </div>
 
+    {{-- PENGADAAN & ANALITIK --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {{-- Procurement Card --}}
+        <div class="card">
+            <div class="card-header border-b border-gray-100">
+                <p class="card-title">Rekomendasi Pengadaan Barang (Restock)</p>
+                <span class="text-xs text-gray-400">Barang di bawah stok minimum</span>
+            </div>
+            <div class="card-body py-0 divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
+                @forelse($lowStocks as $ls)
+                    <div x-data="{ openRequest: false }" class="py-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-gray-800 truncate">{{ $ls->nama_barang }}</p>
+                                <p class="text-xs text-gray-400">Min. Stok: {{ $ls->stok_minimum }} unit · Tersedia: <strong class="text-red-600">{{ $ls->units_count }} unit</strong></p>
+                            </div>
+                            <button x-show="!openRequest" @click="openRequest = true" class="btn-xs btn-primary shrink-0">+ Ajukan Pengadaan</button>
+                        </div>
+                        
+                        {{-- Inline Form --}}
+                        <div x-show="openRequest" x-transition class="bg-gray-50 border border-gray-100 rounded-lg p-3 mt-2">
+                            <form method="POST" action="{{ route('procurement.store', $ls->id) }}" class="flex items-end gap-3">
+                                @csrf
+                                <div class="flex-1">
+                                    <label class="text-[10px] font-bold text-gray-500 block mb-1">JUMLAH UNIT PENGADAAN</label>
+                                    <input name="qty" type="number" required value="{{ max(1, $ls->stok_minimum - $ls->units_count) }}" min="1" class="form-input text-xs w-full py-1 px-2.5 h-8" />
+                                </div>
+                                <div class="flex gap-1.5 shrink-0">
+                                    <button @click="openRequest = false" type="button" class="btn-xs btn-secondary h-8">Batal</button>
+                                    <button type="submit" class="btn-xs btn-primary h-8">Kirim</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-6 text-center text-xs text-gray-400">Semua barang memiliki stok yang aman.</div>
+                @endforelse
+            </div>
+            
+            {{-- Active procurements list --}}
+            @if($activeProcurements->isNotEmpty())
+                <div class="border-t border-gray-100 p-4 bg-gray-50/50 rounded-b-xl">
+                    <p class="text-xs font-bold text-gray-700 mb-2">Pengajuan Aktif:</p>
+                    <div class="space-y-1.5 max-h-[120px] overflow-y-auto">
+                        @foreach($activeProcurements as $ap)
+                            <div class="flex items-center justify-between text-xs bg-white border border-gray-100 rounded p-2">
+                                <span>{{ $ap->product->nama_barang }} ({{ $ap->quantity }} unit)</span>
+                                <span class="badge badge-menunggu text-[9px] capitalize">{{ $ap->status }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        {{-- Advanced Analytics Card --}}
+        <div class="card">
+            <div class="card-header border-b border-gray-100">
+                <p class="card-title">Analitik Keandalan & Utilisasi Aset</p>
+                <span class="text-xs text-gray-400">KPI Performance Aset</span>
+            </div>
+            <div class="card-body space-y-4">
+                {{-- Top Utilisasi --}}
+                <div>
+                    <p class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Top 3 Utilisasi Aktif</p>
+                    <div class="space-y-2">
+                        @foreach($productUtils->take(3) as $pu)
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                    <span>{{ $pu['nama'] }}</span>
+                                    <span class="font-semibold">{{ $pu['active_borrowed'] }}/{{ $pu['total_units'] }} unit ({{ $pu['active_percentage'] }}%)</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-1.5">
+                                    <div class="bg-blue-600 h-1.5 rounded-full" style="width: {{ $pu['active_percentage'] }}%"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Keandalan Aset per Kategori --}}
+                <div class="pt-2">
+                    <p class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Keandalan Aset & Kerugian per Kategori</p>
+                    <div class="space-y-2 max-h-[140px] overflow-y-auto">
+                        @foreach($categoryReliability as $cr)
+                            <div class="flex justify-between items-center text-xs py-1.5 border-b border-gray-50 last:border-0">
+                                <div>
+                                    <span class="font-medium text-gray-800">{{ $cr['nama'] }}</span>
+                                    <p class="text-[10px] text-gray-400">{{ $cr['incident_count'] }} insiden · {{ $cr['write_off_count'] }} write-off</p>
+                                </div>
+                                @if($cr['total_loss'] > 0)
+                                    <span class="font-semibold text-red-600">Rp {{ number_format($cr['total_loss'], 0, ',', '.') }}</span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -187,8 +357,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('borrowingChartMgr');
     if (!ctx) return;
 
-    // Set global font family to Poppins
-    Chart.defaults.font.family = 'Poppins';
+    // Set global font family to SF Pro / System
+    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif';
     Chart.defaults.font.size = 11;
     Chart.defaults.color = '#64748B';
 
@@ -234,8 +404,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 tooltip: {
                     backgroundColor: '#1E293B',
                     padding: 10,
-                    bodyFont: { family: 'Poppins' },
-                    titleFont: { family: 'Poppins', weight: '600' }
+                    bodyFont: { family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' },
+                    titleFont: { family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif', weight: '600' }
                 }
             },
             scales: {

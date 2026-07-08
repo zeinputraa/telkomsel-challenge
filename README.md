@@ -1,58 +1,118 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🧠 DigiInventory System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**DigiInventory System** is an internal digital platform designed to streamline inventory tracking, asset distribution, employee borrowing workflows, and incident reporting.
+---
 
-## About Laravel
+## 🎯 Project Objective
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+This platform aims to manage, allocate, track, and monitor company assets and inventory items across different user levels. It empowers employees to request items, log incidents, print asset labels via QR codes, and manage approvals seamlessly, optimizing internal logistics and provisioning.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 🧩 Key Features
 
-## Learning Laravel
+- **User & Role Management**
+  - Role-based access control (RBAC): Admin, Staff, Manager, and Karyawan (Employee)
+  - Custom role middleware and session-based profile management
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Inventory & Asset Catalog**
+  - Categorization of inventory items
+  - Product unit tracking (individual items with unique serial numbers, condition status, and availability)
+  - Direct QR Code generation for asset units (`simple-qrcode`) for quick scanning
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Asset Borrowing & Return Workflow**
+  - Employees (Karyawan) can request asset borrowing with calendar/availability validation
+  - SLA validations for borrowing approvals (excluding national holidays)
+  - Manager approval for specific high-value items/requests
+  - Staff handover confirmation & letter generation (export to PDF)
+  - Searchable return logs and check-in system
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- **Procurement Requests**
+  - Manager can request procurement of new products
+  - Admin/Staff can verify, approve, or reject procurement requests
 
-## Agentic Development
+- **Incident & Damage Reporting**
+  - Employees can report incidents (damage or loss of borrowed units)
+  - Admin & Staff verification process
+  - Finalization of incidents by Managers or Admins
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- **Periodic Reports & Exporting**
+  - Auto-generated periodic activity reports
+  - Export data to PDF (`barryvdh/laravel-dompdf`) or Excel (`maatwebsite/excel`)
 
-```bash
-composer require laravel/boost --dev
+- **SLA & Calendar Integrations**
+  - Public holidays synchronization and management to ensure SLA and duration calculations exclude non-working days
 
-php artisan boost:install
-```
+- **Notifications & Audit Logging**
+  - In-app alerts for borrowing status updates, returns, and incident reporting
+  - Admin log monitoring and API Token management
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## 🔐 Security & Performance
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- Role-based middleware for security access control
+- API tokens generated securely for administrative integrations
+- Unique QR-based endpoints for quick unit scans without authentication
+- Integrated CSRF protection and Laravel-standard security practices
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 👥 Stakeholders
 
-## Security Vulnerabilities
+- **Primary**: Admin (IT/Asset Managers), Staff (Operations), Manager, Karyawan (Employees requesting assets)
+- **Secondary**: Procurement Team, Management (Viewers of Reports)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+## 🛠️ Technology Stack
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- **Frontend**: Blade Templates + Tailwind CSS + Alpine.js (via Vite)
+- **Backend**: Laravel 13 (PHP ^8.3)
+- **Database**: MySQL
+- **Dependencies**: 
+  - `barryvdh/laravel-dompdf` for PDF generation
+  - `maatwebsite/excel` for Excel exports
+  - `simplesoftwareio/simple-qrcode` for QR code generation
+  - `laravel/sanctum` for API Token authorization
+
+---
+
+## 📦 Organization Repositories
+
+| Repository | Description |
+|------------|-------------|
+| `digi-inventory` | Main repository containing Laravel backend code, views, migrations, and assets |
+
+---
+
+## 🧪 Seeded Test Accounts
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@digi.test` | `password` |
+| Staff | `staff@digi.test` | `password` |
+| Manager | `manager@digi.test` | `password` |
+| Karyawan | `karyawan@digi.test` | `password` |
+
+---
+
+## 📅 Timeline Overview
+
+- **July 2026**: System development begins
+- **August 2026**: Internal testing & deployment
+- **September 2026**: Public launch for internal divisions
+
+---
+
+## 📖 References
+
+- Laravel 13.x Documentation
+- Tailwind CSS Styling Guidelines
+- ISO/IEC 27001 Information Security Management (Best Practices)
+
+---
+
+## 🎓 Corporate Support
+
+This project is proudly supported by the company through its commitment to building digital solutions and fostering innovation in internal enterprise transformation.

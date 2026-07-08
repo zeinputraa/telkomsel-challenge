@@ -4,9 +4,9 @@
         <div class="alert-success mb-5 text-sm">{{ session('status') }}</div>
     @endif
 
-    <div class="mb-6">
-        <h2 class="text-xl font-bold text-gray-900">Masuk ke Sistem</h2>
-        <p class="text-sm text-gray-500 mt-1">Gunakan akun yang sudah terdaftar</p>
+    <div class="mb-6 text-center">
+        <h2 class="text-xl font-bold text-gray-900">Selamat Datang</h2>
+        <p class="text-sm text-gray-500 mt-1">Silakan masuk untuk mulai mengelola inventaris.</p>
     </div>
 
     <form method="POST" action="{{ route('login') }}" class="space-y-5">
