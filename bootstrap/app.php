@@ -13,6 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->registered(function ($app) {
+        if (file_exists(base_path('../public_html'))) {
+            $app->usePublicPath(realpath(base_path('../public_html')));
+        }
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => CheckRole::class,
